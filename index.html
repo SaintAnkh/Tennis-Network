@@ -23,7 +23,7 @@ small{color:#666}
 <h2>Crew login</h2>
 <div class="box" id="auth"></div>
 <div id="crew" style="display:none">
-  <h2>Report a result</h2>
+  <div id="pend"></div><h2>Report a result</h2>
   <div class="box">
     <select id="w"></select><select id="l"></select>
     <input id="sc" placeholder="Score (e.g. 6-4 6-3)">
@@ -40,7 +40,8 @@ small{color:#666}
 const SUPABASE_URL="https://dnelocfzgwikfsmzhedn.supabase.co";
 const SUPABASE_KEY="sb_publishable_Hx1S93WXdyooJur6TXCjMw_twp-9PGR";
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
-let players=[],matches=[],session=null;
+let players=[],matches=[],pending=[],session=null;
+const ADMIN="agadaorderd@gmail.com";
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
@@ -53,7 +54,10 @@ function standings(){
 async function load(){
   const p=await sb.from("players").select("*");
   const m=await sb.from("matches").select("*").order("id",{ascending:false});
-  players=p.data||[];matches=m.data||[];render();
+  players=p.data||[];const all=m.data||[];
+matches=all.filter(x=>x.status==="approved");
+pending=all.filter(x=>x.status==="pending");
+render();renderPending();
 }
 function render(){
   const s=standings(),name=id=>(players.find(p=>p.id===id)||{}).name;
@@ -69,13 +73,30 @@ function render(){
 async function report(){
   const w=+$("w").value,l=+$("l").value;
   if(!w||!l||w===l)return alert("Pick two different players");
-  const s=standings();
-  const rw=s.findIndex(p=>p.id===w)+1,rl=s.findIndex(p=>p.id===l)+1;
-  const pts=rw>rl?10+5*(rw-rl):10;
-  const {error}=await sb.from("matches").insert({winner_id:w,loser_id:l,score:$("sc").value,
-    winner_rank:rw,loser_rank:rl,points_awarded:pts});
+  const {error}=await sb.from("matches").insert({winner_id:w,loser_id:l,score:$("sc").value,status:"pending"});
   if(error)return alert(error.message);
-  $("sc").value="";load();
+  $("sc").value="";alert("Submitted! It will count once approved.");load();
+}
+async function approve(id){
+  const m=pending.find(x=>x.id===id),s=standings();
+  const rw=s.findIndex(p=>p.id===m.winner_id)+1,rl=s.findIndex(p=>p.id===m.loser_id)+1;
+  const pts=rw>rl?10+5*(rw-rl):10;
+  const {error}=await sb.from("matches").update({status:"approved",winner_rank:rw,loser_rank:rl,points_awarded:pts}).eq("id",id);
+  if(error)return alert(error.message);load();
+}
+async function reject(id){
+  if(!confirm("Reject this result?"))return;
+  const {error}=await sb.from("matches").delete().eq("id",id);
+  if(error)return alert(error.message);load();
+}
+function renderPending(){
+  const el=$("pend");
+  if(!session||session.user.email.toLowerCase()!==ADMIN){el.innerHTML="";return;}
+  const name=id=>(players.find(p=>p.id===id)||{}).name;
+  el.innerHTML=pending.length?"<h2>Pending approval</h2>"+pending.map(m=>
+    `<div class="box">${esc(name(m.winner_id))} beat ${esc(name(m.loser_id))}<br><small>${esc(m.score)} · ${m.played_on}</small>
+    <button onclick="approve(${m.id})">Approve</button>
+    <button onclick="reject(${m.id})" style="background:#a33">Reject</button></div>`).join(""):"";
 }
 async function addPlayer(){
   const n=$("np").value.trim();if(!n)return;
@@ -110,7 +131,7 @@ async function signUp(){
   <button onclick="$('pv').innerHTML=''">Close</button></div>`;
   $("pv").scrollIntoView({behavior:"smooth"});
 }
-sb.auth.onAuthStateChange((_e,s)=>{session=s;renderAuth()});
+sb.auth.onAuthStateChange((_e,s)=>{session=s;renderAuth();load()});
 sb.auth.getSession().then(({data})=>{session=data.session;renderAuth()});
 load();
 </script></body></html>
