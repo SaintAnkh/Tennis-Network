@@ -79,7 +79,8 @@ async function report(){
 }
 async function approve(id){
   const m=pending.find(x=>x.id===id),s=standings();
-  const rw=s.findIndex(p=>p.id===m.winner_id)+1,rl=s.findIndex(p=>p.id===m.loser_id)+1;
+  const pw=s.find(p=>p.id===m.winner_id).pts,pl=s.find(p=>p.id===m.loser_id).pts;
+const rw=1+s.filter(p=>p.pts>pw).length,rl=1+s.filter(p=>p.pts>pl).length;
   const pts=rw>rl?10+5*(rw-rl):10;
   const {error}=await sb.from("matches").update({status:"approved",winner_rank:rw,loser_rank:rl,points_awarded:pts}).eq("id",id);
   if(error)return alert(error.message);load();
