@@ -17,6 +17,7 @@ small{color:#666}
 <small>Win points = 10 + 5 × rank gap</small>
 
 <h2>Standings</h2><table id="st"></table>
+<div id="pv"></div>
 <h2>Recent matches</h2><table id="mt"></table>
 
 <h2>Crew login</h2>
@@ -57,7 +58,7 @@ async function load(){
 function render(){
   const s=standings(),name=id=>(players.find(p=>p.id===id)||{}).name;
   $("st").innerHTML="<tr><th>#</th><th>Player</th><th>Pts</th></tr>"+
-    s.map((p,i)=>`<tr><td>${i+1}</td><td>${esc(p.name)}</td><td>${p.pts}</td></tr>`).join("");
+    s.map((p,i)=>`<tr><td>${i+1}</td><td><a href="#" onclick="showPlayer(${p.id});return false">${esc(p.name)}</a></td><td>${p.pts}</td></tr>`).join("");
   $("mt").innerHTML=matches.slice(0,15).map(m=>
     `<tr><td>${esc(name(m.winner_id))} beat ${esc(name(m.loser_id))}<br><small>${esc(m.score)} · ${m.played_on}</small></td><td>+${m.points_awarded}</td></tr>`).join("")
     ||"<tr><td>No matches yet</td></tr>";
@@ -96,6 +97,18 @@ async function signIn(){
 async function signUp(){
   const {error}=await sb.auth.signUp({email:$("em").value,password:$("pw").value});
   alert(error?error.message:"Account created. Check your email to confirm, then sign in.");
+}
+  function showPlayer(id){
+  const s=standings(),i=s.findIndex(p=>p.id===id);
+  if(i<0){$("pv").innerHTML="";return;}
+  const p=s[i],name=x=>(players.find(q=>q.id===x)||{}).name;
+  const mine=matches.filter(m=>m.winner_id===id||m.loser_id===id);
+  const w=mine.filter(m=>m.winner_id===id).length;
+  $("pv").innerHTML=`<div class="box"><b>${esc(p.name)}</b> · Rank #${i+1} · ${p.pts} pts<br><small>${w} wins, ${mine.length-w} losses</small>
+  <table>${mine.map(m=>{const win=m.winner_id===id;
+  return `<tr><td>${win?"✅ Beat":"❌ Lost to"} ${esc(name(win?m.loser_id:m.winner_id))}<br><small>${esc(m.score)} · ${m.played_on}</small></td><td>${win?"+"+m.points_awarded:"0"}</td></tr>`}).join("")||"<tr><td>No matches yet</td></tr>"}</table>
+  <button onclick="$('pv').innerHTML=''">Close</button></div>`;
+  $("pv").scrollIntoView({behavior:"smooth"});
 }
 sb.auth.onAuthStateChange((_e,s)=>{session=s;renderAuth()});
 sb.auth.getSession().then(({data})=>{session=data.session;renderAuth()});
