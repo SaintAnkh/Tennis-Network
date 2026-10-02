@@ -70,7 +70,7 @@ async function report(){
   if(!w||!l||w===l)return alert("Pick two different players");
   const s=standings();
   const rw=s.findIndex(p=>p.id===w)+1,rl=s.findIndex(p=>p.id===l)+1;
-  const pts=10+5*Math.abs(rw-rl);
+  const pts=rw>rl?10+5*(rw-rl):10;
   const {error}=await sb.from("matches").insert({winner_id:w,loser_id:l,score:$("sc").value,
     winner_rank:rw,loser_rank:rl,points_awarded:pts});
   if(error)return alert(error.message);
